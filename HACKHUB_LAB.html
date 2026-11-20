@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HACKHUB LAB</title>
+<style>
+:root{
+  --bg:#0b0f0c; --panel:#0f1a12; --fg:#39ff7a; --fg-dim:#1fae52;
+  --accent:#ff4466; --accent2:#ffcc33; --border:#1f3a26; --muted:#6a8a74; --blue:#88ccff;
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{background:var(--bg);color:var(--fg);font-family:'Courier New',ui-monospace,monospace;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  display:flex;flex-direction:column;min-height:100%;}
+button{font-family:inherit;cursor:pointer;}
+#top{padding:8px 14px;border-bottom:1px solid var(--border);display:none;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+#top h1{font-size:14px;margin:0;letter-spacing:2px;}
+#stats{display:flex;gap:12px;font-size:11px;align-items:center;flex-wrap:wrap;}
+.tbtn{background:transparent;color:var(--fg);border:1px solid var(--border);padding:3px 8px;font-size:11px;}
+.tbtn:hover{background:var(--panel);}
+#integWrap{display:none;align-items:center;gap:6px;font-size:11px;color:var(--accent2);}
+#integBar{width:90px;height:8px;border:1px solid var(--border);background:#071009;}
+#integFill{height:100%;width:100%;background:var(--fg);transition:width .3s,background .3s;}
+#main{flex:1;display:none;min-height:0;}
+#termwrap{flex:1;display:flex;flex-direction:column;min-width:0;}
+#screen{flex:1;overflow-y:auto;padding:12px 14px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
+#screen .cmd{color:#fff;} #screen .err{color:var(--accent);} #screen .warn{color:var(--accent2);}
+#screen .hint{color:var(--muted);} #screen .blue{color:var(--blue);} #screen .ok{color:var(--fg);}
+#inputline{display:flex;align-items:center;padding:8px 14px;border-top:1px solid var(--border);gap:6px;}
+#prompt{font-size:13px;white-space:nowrap;}
+#cmdInput{flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--fg);font-family:inherit;font-size:16px;}
+#side{width:250px;border-left:1px solid var(--border);padding:10px;font-size:12px;overflow-y:auto;flex-shrink:0;}
+#side h2{font-size:11px;color:var(--muted);margin:12px 0 6px;letter-spacing:1px;}
+#side h2:first-child{margin-top:0;}
+#side ul{margin:0;padding:0;} #side li{list-style:none;padding:3px 0;}
+#side .sbtn{display:block;width:100%;margin:4px 0;background:transparent;color:var(--fg);border:1px solid var(--border);padding:5px;font-size:11px;text-align:left;}
+#side .sbtn:hover{background:var(--panel);}
+@media (max-width:700px){#side{display:none;}}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:16px;z-index:30;}
+.overlay.show{display:flex;}
+.box{border:1px solid var(--border);padding:22px;max-width:640px;width:100%;max-height:92vh;overflow-y:auto;background:var(--panel);}
+.box h2{margin:0 0 10px;font-size:16px;}
+.box .body{font-size:13px;line-height:1.65;color:#cfe9d6;}
+.box code{background:#0a0f0b;border:1px solid var(--border);padding:1px 5px;color:var(--accent2);}
+.box code.try{cursor:pointer;display:inline-block;margin:2px 0;} .box code.try:hover{background:#16301d;}
+.box pre{background:#0a0f0b;border:1px solid var(--border);padding:8px;overflow-x:auto;color:var(--blue);font-size:12px;}
+.box input[type=text]{width:100%;background:#0a0f0b;border:1px solid var(--border);color:var(--fg);font-family:inherit;padding:8px;font-size:16px;margin-top:8px;}
+.row{display:flex;gap:8px;margin-top:16px;justify-content:space-between;align-items:center;}
+.btn{background:var(--fg);color:#000;border:none;padding:9px 16px;font-weight:bold;}
+.btn.sec{background:transparent;color:var(--fg);border:1px solid var(--border);}
+#editor{width:100%;height:55vh;background:#0a0f0b;color:var(--fg);border:1px solid var(--border);font-family:inherit;font-size:13px;padding:8px;resize:vertical;}
+</style>
+</head>
+<body>
+
+<div class="overlay show" id="setupOverlay">
+  <div class="box" style="max-width:460px;text-align:center;">
+    <h2>🕶 HACKHUB LAB</h2>
+    <div style="color:var(--muted);font-size:12px;line-height:1.6;">
+      브라우저 안에서 동작하는 사이버보안 실습 랩입니다.<br>
+      모든 파일·서버·공격자는 가상이며 실제 네트워크 활동은 일절 없습니다.
+    </div>
+    <input type="text" id="nameInput" placeholder="코드네임 입력 (예: ghost)" value="ghost" maxlength="16">
+    <button class="btn" style="width:100%;margin-top:16px;" id="startBtn">새로 시작</button>
+    <button class="btn sec" style="width:100%;margin-top:8px;display:none;" id="contBtn">이어하기 (저장된 진행)</button>
+  </div>
+</div>
+
+<div id="top">
+  <h1>🕶 HACKHUB LAB</h1>
+  <div id="stats">
+    <div>점수 <span id="scoreVal">0</span></div>
+    <div>미션 <span id="missionProg">0/6</span></div>
+    <div id="integWrap">무결성 <div id="integBar"><div id="integFill"></div></div><span id="integTxt">100%</span> <span id="defTime"></span></div>
+    <button class="tbtn" id="btnTut">? 튜토리얼</button>
+    <button class="tbtn" id="btnUp">⬆ 업로드</button>
+    <button class="tbtn" id="btnMis">미션</button>
+  </div>
+</div>
+<div id="main">
+  <div id="termwrap">
+    <div id="screen"></div>
+    <div id="inputline">
+      <span id="prompt">user@lab:~$</span>
+      <input id="cmdInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="help / tutorial / missions">
+    </div>
+  </div>
+  <div id="side">
+    <h2>MISSIONS</h2><ul id="missionList"></ul>
+    <h2>FLAGS</h2><ul id="flagList"></ul>
+    <h2>TOOLS</h2>
+    <button class="sbtn" id="sbTut">📖 튜토리얼 열기</button>
+    <button class="sbtn" id="sbUp">⬆ 파일 업로드 (~/uploads)</button>
+    <button class="sbtn" id="sbExp">💾 진행 기록 내보내기</button>
+  </div>
+</div>
+
+<input type="file" id="fileInput" multiple style="display:none">
+
+<div class="overlay" id="tutOverlay">
+  <div class="box">
+    <h2 id="tutTitle"></h2>
+    <div class="body" id="tutBody"></div>
+    <div class="row">
+      <button class="btn sec" id="tutPrev">◀ 이전</button>
+      <span id="tutPage" style="color:var(--muted);font-size:12px;"></span>
+      <button class="btn" id="tutNext">다음 ▶</button>
+    </div>
+    <div style="text-align:center;margin-top:10px;"><button class="btn sec" id="tutClose">닫고 실습하기</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="box" style="max-width:760px;">
+    <h2 id="editTitle">edit</h2>
+    <textarea id="editor" spellcheck="false"></textarea>
+    <div class="row"><span style="color:var(--muted);font-size:12px;">Ctrl+S 저장 · Esc 취소</span>
+      <span><button class="btn sec" id="editCancel">취소</button> <button class="btn" id="editSave">저장</button></span></div>
+  </div>
+</div>
+
+<div class="overlay" id="overOverlay">
+  <div class="box" style="text-align:center;">
+    <div id="overMsg" style="font-size:15px;line-height:1.7;"></div>
+    <button class="btn" style="margin-top:14px;" id="overClose">계속 (자유 실습 / defend 재도전)</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   HACKHUB LAB — 브라우저 내 가상 Linux 사이버보안 실습 랩
+   * 모든 것은 JS로 구현된 시뮬레이션입니다. 실제 네트워크/시스템 접근 없음.
+   ===================================================================== */
+const SAVE_KEY='hackhub_lab_v2', TUT_KEY='hackhub_lab_tut_seen';
+let S=null;
+const $=id=>document.getElementById(id);
+const screenEl=$('screen'), input=$('cmdInput'), promptEl=$('prompt');
+
+function println(t,c){const d=document.createElement('div');if(c)d.className=c;d.textContent=(t===''||t==null)?'\u00a0':String(t);screenEl.appendChild(d);screenEl.scrollTop=screenEl.scrollHeight;}
+function printBlock(t,c){String(t).split('\n').forEach(x=>println(x,c));}
+const lines=t=>{if(!t)return[];const a=String(t).split('\n');if(a[a.length-1]==='')a.pop();return a;};
+
+/* ---------- 유틸 ---------- */
+function seedRng(seed){let s=seed>>>0;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
+function rot13(t){return t.replace(/[a-zA-Z]/g,c=>{const b=c<='Z'?65:97;return String.fromCharCode((c.charCodeAt(0)-b+13)%26+b);});}
+function sha256(str){
+  const bytes=Array.from(new TextEncoder().encode(str));
+  const primes=[];for(let n=2;primes.length<64;n++){if(primes.every(p=>n%p))primes.push(n);}
+  const frac=x=>Math.floor((x-Math.floor(x))*4294967296);
+  const K=primes.map(p=>frac(Math.cbrt(p)));
+  let H=primes.slice(0,8).map(p=>frac(Math.sqrt(p)));
+  const l=bytes.length*8;bytes.push(0x80);while(bytes.length%64!==56)bytes.push(0);
+  for(let i=7;i>=0;i--)bytes.push(i>3?0:(l>>>(i*8))&255);
+  const rotr=(x,n)=>(x>>>n)|(x<<(32-n));
+  for(let o=0;o<bytes.length;o+=64){
+    const w=new Array(64);
+    for(let i=0;i<16;i++)w[i]=(bytes[o+4*i]<<24)|(bytes[o+4*i+1]<<16)|(bytes[o+4*i+2]<<8)|bytes[o+4*i+3];
+    for(let i=16;i<64;i++){const s0=rotr(w[i-15],7)^rotr(w[i-15],18)^(w[i-15]>>>3);const s1=rotr(w[i-2],17)^rotr(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)|0;}
+    let [a,b,c,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){
+      const S1=rotr(e,6)^rotr(e,11)^rotr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[i]+w[i])|0;
+      const S0=rotr(a,2)^rotr(a,13)^rotr(a,22),mj=(a&b)^(a&c)^(b&c),t2=(S0+mj)|0;
+      h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+    }
+    const v=[a,b,c,d,e,f,g,h];H=H.map((x,i)=>(x+v[i])|0);
+  }
+  return H.map(v=>(v>>>0).toString(16).padStart(8,'0')).join('');
+}
+const permStr=m=>[...m].map(d=>{d=+d;return(d&4?'r':'-')+(d&2?'w':'-')+(d&1?'x':'-');}).join('');
+const tstamp=()=>new Date().toTimeString().slice(0,8);
+
+/* ---------- 가상 파일 시스템 ---------- */
+const D=(c={},m='755')=>({t:'d',c,m});
+const F=(d='',m='644')=>({t:'f',d,m});
+const homeDir=()=>'/home/'+S.user;
+function norm(p){const parts=[];for(const s of p.split('/')){if(!s||s==='.')continue;if(s==='..')parts.pop();else parts.push(s);}return'/'+parts.join('/');}
+function abs(p){if(p==='~'||p.startsWith('~/'))p=homeDir()+p.slice(1);if(!p.startsWith('/'))p=S.cwd+'/'+p;return norm(p);}
+function node(path){let n=S.fs;for(const s of norm(path).split('/').filter(Boolean)){if(!n||n.t!=='d'||!(s in n.c))return null;n=n.c[s];}return n;}
+function parentOf(path){const p=norm(path);const i=p.lastIndexOf('/');return{dir:node(i===0?'/':p.slice(0,i)),name:p.slice(i+1),path:p};}
+function writeFile(path,data,append){
+  const{dir,name}=parentOf(path);
+  if(!dir||dir.t!=='d')throw new Error(path+': No such file or directory');
+  if(!name)throw new Error('잘못된 경로');
+  const ex=dir.c[name];
+  if(ex&&ex.t==='d')throw new Error(name+': Is a directory');
+  if(ex)ex.d=append?ex.d+data:data;else dir.c[name]=F(data);
+}
+function mkdirp(path){let n=S.fs;for(const s of norm(path).split('/').filter(Boolean)){if(!n.c[s])n.c[s]=D();n=n.c[s];}return n;}
+function putFile(path,data,m){const p=norm(path);const i=p.lastIndexOf('/');const d=mkdirp(i===0?'/':p.slice(0,i));d.c[p.slice(i+1)]=F(data,m||'644');}
+function ftext(p){const n=node(abs(p));if(!n)throw new Error(p+': No such file or directory');if(n.t==='d')throw new Error(p+': Is a directory');return n.d;}
+function walk(path,n,cb){cb(path,n);if(n.t==='d')Object.keys(n.c).sort().forEach(k=>walk((path==='/'?'':path)+'/'+k,n.c[k],cb));}
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+function genAuthLog(){
+  const r=seedRng(1337),ev=[];
+  const users=['root','admin','test','oracle','ubuntu','postgres','deploy'];
+  const add=(ip,n,fail)=>{for(let i=0;i<n;i++)ev.push({r:r(),ip,fail});};
+  add('203.0.113.77',47,true);add('198.51.100.9',12,true);add('192.0.2.14',5,true);
+  add('10.0.0.5',4,false);add('10.0.0.8',3,false);
+  ev.sort((a,b)=>a.r-b.r);
+  let t=0;const out=[];
+  ev.forEach(e=>{
+    t+=Math.floor(r()*45)+4;
+    const hh=2+Math.floor(t/3600),mm=Math.floor(t%3600/60),ss=t%60;
+    const ts='Nov 19 '+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+    const pid=1000+Math.floor(r()*8000),port=30000+Math.floor(r()*30000);
+    if(e.fail)out.push(ts+' srv01 sshd['+pid+']: Failed password for '+users[Math.floor(r()*users.length)]+' from '+e.ip+' port '+port+' ssh2');
+    else out.push(ts+' srv01 sshd['+pid+']: Accepted publickey for deploy from '+e.ip+' port '+port+' ssh2');
+  });
+  return out.join('\n')+'\n';
+}
+const M5_FLAG='FLAG{encoding_is_not_encryption}';
+function buildFS(){
+  S.fs=D();const h=homeDir();
+  ['/etc/ssh','/var/log','/var/www/uploads','/var/www/html','/opt','/tmp',h+'/uploads',h+'/ctf/m1/.cache',h+'/ctf/m5',h+'/webapp'].forEach(p=>mkdirp(p));
+  node('/var/www/uploads').m='777';node('/tmp').m='777';
+  putFile(h+'/README.txt','HACKHUB LAB 에 오신 것을 환영합니다.\n\n여기는 가상 서버 srv01 의 운영자 계정입니다.\n- missions 로 미션 목록 확인\n- tutorial 로 사용법 확인\n- 모든 것은 가상이며 실제 시스템에는 아무 영향이 없습니다.\n');
+  putFile(h+'/ctf/m1/notice.txt','이 디렉터리에는 눈에 보이지 않는 파일이 숨어 있습니다.\nls 의 옵션이나 find 명령을 떠올려 보세요.\n');
+  putFile(h+'/ctf/m1/decoy.txt','이건 미끼 파일입니다. 플래그는 없어요.\n');
+  putFile(h+'/ctf/m1/.cache/junk.tmp','쓸모없는 임시 파일\n');
+  putFile(h+'/ctf/m1/.cache/.hidden_flag','FLAG{hidden_files_are_not_secret}\n');
+  putFile(h+'/ctf/m5/notes.txt','트래픽에서 수상한 토큰을 캡처했다. 한 겹이 아닌 것 같다.\n(힌트: 순서대로 풀어 보자. # 로 시작하는 줄은 주석이다.)\n');
+  putFile(h+'/ctf/m5/capture.txt','# captured from /api/token\n'+btoa(rot13(M5_FLAG))+'\n');
+  putFile(h+'/webapp/app.py',
+'from flask import Flask, request\nimport sqlite3\n\napp = Flask(__name__)\nSECRET_KEY = "SuperSecret123"\nDB_PASSWORD = "admin1234"\n\n@app.route("/login", methods=["POST"])\ndef login():\n    name = request.form["name"]\n    pw = request.form["pw"]\n    db = sqlite3.connect("users.db")\n    query = "SELECT * FROM users WHERE name=\'" + name + "\' AND pw=\'" + pw + "\'"\n    row = db.execute(query).fetchone()\n    return "ok" if row else "denied"\n\nif __name__ == "__main__":\n    app.run(host="0.0.0.0", debug=True)\n');
+  putFile('/var/log/auth.log',genAuthLog());
+  putFile('/var/log/ids.log','');
+  putFile('/etc/ssh/sshd_config','# sshd 설정 (srv01)\nPort 22\nPermitRootLogin yes\nPasswordAuthentication yes\nPubkeyAuthentication yes\nMaxAuthTries 6\nX11Forwarding no\n');
+  putFile('/etc/hostname','srv01\n');
+  putFile('/etc/os-release','NAME="HackHub Sim Linux"\nVERSION="1.0 (virtual)"\n');
+  putFile('/var/www/html/index.html','<h1>corp portal</h1>\n');
+  putFile('/opt/backup.sh','#!/bin/bash\ntar czf /backup/site.tgz /var/www\n','666');
+}
+function newState(user){
+  return{user,cwd:'/home/'+user,fs:null,score:0,cur:1,done:{},hints:{},flags:[],
+    services:{sshd:'active',apache2:'active',telnetd:'active'},ufw:['allow 22','allow 80'],
+    sshdRestarted:false,m1ok:false,m5ok:false,history:[]};
+}
+function save(){try{S.history=S.history.slice(-200);localStorage.setItem(SAVE_KEY,JSON.stringify(S));}catch(e){}}
+
+/* ---------- 상태 조회(체크 함수) ---------- */
+const cfg=()=>{const n=node('/etc/ssh/sshd_config');return n&&n.t==='f'?n.d:'';};
+const cfgHas=(k,v)=>new RegExp('^\\s*'+k+'\\s+'+v+'\\s*$','mi').test(cfg());
+const sshSecure=()=>cfgHas('PermitRootLogin','no')&&cfgHas('PasswordAuthentication','no');
+const sshWeak=()=>/^\s*(PermitRootLogin|PasswordAuthentication)\s+yes/mi.test(cfg());
+const ufwBlocksIp=ip=>!!ip&&S.ufw.includes('deny from '+ip);
+const ufwHasPort=p=>S.ufw.includes('deny '+p);
+function wwr(path){const n=node(path);return!!n&&((parseInt(n.m.slice(-1),10)&2)!==0);}
+function appChecks(){
+  const n=node(homeDir()+'/webapp/app.py');const d=n&&n.t==='f'?n.d:'';
+  return[
+    {l:'SQL 문자열 연결 제거',ok:d!==''&&!/["']\s*\+\s*(name|pw)\b/.test(d)&&!/\b(name|pw)\s*\+\s*["']/.test(d)},
+    {l:'파라미터화 쿼리 사용 (WHERE name=? AND pw=? + execute(query, (...)))',ok:/WHERE[^"'\n]*\?[^"'\n]*\?[^"'\n]*["']/i.test(d)&&/execute\([^)]*,\s*[\(\[]/.test(d)},
+    {l:'하드코딩된 비밀번호/키 제거',ok:d!==''&&!/SuperSecret123|admin1234/.test(d)},
+    {l:'debug=True 제거',ok:d!==''&&!/debug\s*=\s*True/.test(d)}
+  ];
+}
+
+/* ---------- 미션 정의 ---------- */
+const FLAGS={2:'FLAG{block_the_noisy_ip}',3:'FLAG{harden_ssh_config}',4:'FLAG{parameterized_queries_win}',6:'FLAG{defense_in_depth}'};
+const MISSIONS=[
+ {id:1,title:'리눅스 기본기: 숨은 파일 찾기',pts:100,submit:'FLAG{hidden_files_are_not_secret}',
+  brief:'~/ctf/m1 어딘가에 숨겨진 플래그 파일이 있다.\n파일을 찾아 내용을 읽고 `submit FLAG{...}` 로 제출하라.\n\n배우는 것: ls -a, cd, cat, find',
+  hints:['점(.)으로 시작하는 파일은 기본 ls 에 보이지 않는다. `ls -a` 를 써 보자.','`cd ctf/m1` 후 `ls -a` → 숨김 디렉터리 .cache 안을 확인.','`cat ctf/m1/.cache/.hidden_flag` 또는 `find ~ -name ".hidden*"`'],
+  check:()=>[{l:'플래그 제출',ok:!!S.m1ok}]},
+ {id:2,title:'로그 분석: 무차별 대입 IP 차단',pts:100,
+  brief:'/var/log/auth.log 를 분석해 SSH 무차별 대입(brute-force)을 가장 많이 시도한 IP를 찾아라.\n그 IP를 ufw 로 차단하되, 정상 접속 IP(10.0.0.x)는 차단하면 안 된다.\n\n배우는 것: grep | awk | sort | uniq -c, ufw',
+  hints:['실패 로그만 추려 보자: `grep Failed /var/log/auth.log | head`','IP는 11번째 필드다: `grep Failed /var/log/auth.log | awk \'{print $11}\' | sort | uniq -c | sort -rn`','가장 많은 IP를 `ufw deny from <IP>` 로 차단 후 `ufw status` 로 확인.'],
+  check:()=>[{l:'공격 IP 203.0.113.77 차단',ok:ufwBlocksIp('203.0.113.77')},{l:'정상 IP(10.0.0.5, 10.0.0.8) 미차단',ok:!ufwBlocksIp('10.0.0.5')&&!ufwBlocksIp('10.0.0.8')}]},
+ {id:3,title:'서버 하드닝: SSH 설정 강화',pts:100,
+  brief:'/etc/ssh/sshd_config 의 위험한 설정을 찾아 고치고 sshd 를 재시작하라.\n- root 직접 로그인 금지\n- 비밀번호 인증 금지(키 인증만)\n\n배우는 것: cat, edit / sed -i, systemctl',
+  hints:['`cat /etc/ssh/sshd_config` 에서 yes 로 된 위험 항목을 찾자. `audit /etc/ssh/sshd_config` 도 도움이 된다.','`edit /etc/ssh/sshd_config` 로 PermitRootLogin 과 PasswordAuthentication 을 no 로 바꾸자.','`sed -i \'s/PermitRootLogin yes/PermitRootLogin no/\' /etc/ssh/sshd_config` 후 `systemctl restart sshd`'],
+  check:()=>[{l:'PermitRootLogin no',ok:cfgHas('PermitRootLogin','no')},{l:'PasswordAuthentication no',ok:cfgHas('PasswordAuthentication','no')},{l:'systemctl restart sshd 로 적용',ok:!!S.sshdRestarted&&sshSecure()}]},
+ {id:4,title:'코드 취약점 분석: SQL 인젝션 패치',pts:100,
+  brief:'~/webapp/app.py 에는 여러 취약점이 있다. 직접 읽고 `audit` 로 점검한 뒤 패치하라.\n- SQL 문자열 연결(인젝션)\n- 하드코딩된 비밀번호/키\n- 운영 환경의 debug=True\n\n`check` 로 패치 진행 상황을 확인할 수 있다.',
+  hints:['`audit ~/webapp/app.py` 로 취약 줄을 확인하자.','쿼리를 `"SELECT * FROM users WHERE name=? AND pw=?"` 로 바꾸고 `db.execute(query, (name, pw))` 로 실행한다.','비밀값은 코드에서 제거(예: os.environ 사용), `debug=False` 로 변경. `edit ~/webapp/app.py`'],
+  check:()=>appChecks()},
+ {id:5,title:'디지털 포렌식: 겹겹이 인코딩된 토큰',pts:100,submit:M5_FLAG,
+  brief:'~/ctf/m5/capture.txt 에 캡처된 토큰이 있다. 여러 겹으로 인코딩되어 있다.\n풀어서 FLAG{...} 를 `submit` 하라.\n\n배우는 것: 파이프, base64 -d, rot13  (교훈: 인코딩은 암호화가 아니다)',
+  hints:['`cat ~/ctf/m5/notes.txt` 와 `cat ~/ctf/m5/capture.txt` 를 먼저 읽자.','주석 줄은 빼고 본문만: `grep -v "#" ~/ctf/m5/capture.txt`','`grep -v "#" ~/ctf/m5/capture.txt | base64 -d | rot13`'],
+  check:()=>[{l:'플래그 제출',ok:!!S.m5ok}]},
+ {id:6,title:'최종전: AI 레드팀과 실시간 방어전',pts:200,
+  brief:'RED-AI "Mantis" 가 srv01 을 실시간으로 공격한다. 약 60초간 서버 무결성을 지켜라.\n\n- `defend` 로 방어전 시작 (무결성 100%, 0이 되면 패배)\n- IDS 경보를 읽고 어떤 취약점을 노리는지 파악 → 즉시 패치\n- 공격 IP는 ufw 로 차단 (AI는 차단을 감지하고 우회 IP로 전환한다)\n- 사전에 서버를 점검해 둘수록 유리하다:\n  ss -tlnp / find / -perm -o+w / ls -l /opt /var/www / ps\n\n`soc` 로 현황 확인.',
+  hints:['열린 포트 확인: `ss -tlnp` → telnet(23)은 위험하다. `systemctl stop telnetd`','세계 쓰기 가능 파일/디렉터리: `find / -perm -o+w` → `chmod 750 /var/www/uploads`, `chmod 750 /opt/backup.sh`','플러드 IP가 바뀌면 `ufw deny from <새 IP>` 를 반복. 방어전 전에 미리 패치해 두는 것이 가장 좋다.'],
+  check:()=>[{l:'방어전 승리',ok:!!S.done[6]}]}
+];
+const flagCount=()=>S.flags.length;
+
+function finish(id){
+  const m=MISSIONS[id-1];if(!m||S.done[id])return;
+  S.done[id]=true;S.score+=m.pts;
+  println('');println('🏁 미션 '+id+' 완료: '+m.title+'  (+'+m.pts+'점)','warn');
+  const fl=m.submit||FLAGS[id];if(fl&&!S.flags.includes(fl)){S.flags.push(fl);println('🚩 '+fl,'ok');}
+  if(id===S.cur&&id<6){S.cur=id+1;println('📬 새 미션 열림: '+MISSIONS[id].title+'  (mission '+(id+1)+')','warn');}
+  save();updateUI();
+  if(MISSIONS.every(x=>S.done[x.id])){
+    $('overMsg').innerHTML='🏆 모든 미션 클리어!<br>최종 점수: '+S.score+'<br><span style="color:var(--muted);font-size:12px;">계속 자유 실습을 하거나 defend 로 재도전할 수 있습니다.</span>';
+    $('overOverlay').classList.add('show');
+  }
+}
+function evalMission(){
+  const m=MISSIONS[S.cur-1];
+  if(!m||S.done[m.id]||m.submit||m.id===6)return;
+  if(m.check().every(c=>c.ok))finish(m.id);
+}
+
+/* ---------- 쉘: 토크나이저 / 파서 ---------- */
+function expandVars(s){return s.replace(/\$(\w+)/g,(m,k)=>({HOME:homeDir(),USER:S.user,PWD:S.cwd}[k]||''));}
+function tokenize(line){
+  const out=[];let i=0;const n=line.length;
+  while(i<n){
+    const c=line[i];
+    if(c===' '||c==='\t'){i++;continue;}
+    if(c==='|'){out.push({op:'|'});i++;continue;}
+    if(c===';'){out.push({op:';'});i++;continue;}
+    if(c==='&'&&line[i+1]==='&'){out.push({op:'&&'});i+=2;continue;}
+    if(c==='>'){if(line[i+1]==='>'){out.push({op:'>>'});i+=2;}else{out.push({op:'>'});i++;}continue;}
+    let s='',q=false;
+    while(i<n&&!' \t|;>'.includes(line[i])&&!(line[i]==='&'&&line[i+1]==='&')){
+      const ch=line[i];
+      if(ch==="'"){q=true;const j=line.indexOf("'",i+1);if(j<0)throw new Error('따옴표가 닫히지 않았습니다');s+=line.slice(i+1,j);i=j+1;}
+      else if(ch==='"'){q=true;const j=line.indexOf('"',i+1);if(j<0)throw new Error('따옴표가 닫히지 않았습니다');s+=expandVars(line.slice(i+1,j));i=j+1;}
+      else{let j=i;while(j<n&&!' \t|;>\'"'.includes(line[j])&&!(line[j]==='&'&&line[j+1]==='&'))j++;s+=expandVars(line.slice(i,j));i=j;}
+    }
+    out.push({s,q});
+  }
+  return out;
+}
+function expandGlob(t){
+  if(t.q||!/[*?]/.test(t.s))return[t.s];
+  const p=t.s,i=p.lastIndexOf('/'),dirp=i>=0?p.slice(0,i+1):'',base=p.slice(i+1);
+  const dn=node(abs(dirp||'.'));if(!dn||dn.t!=='d')return[p];
+  const re=new RegExp('^'+base.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.')+'$');
+  const m=Object.keys(dn.c).filter(n=>re.test(n)&&(base.startsWith('.')||!n.startsWith('.'))).sort().map(n=>dirp+n);
+  return m.length?m:[p];
+}
+async function execLine(line){
+  let toks;try{toks=tokenize(line);}catch(e){println(e.message,'err');return;}
+  const seqs=[];let cur=[];
+  for(const t of toks){if(t.op===';'||t.op==='&&'){seqs.push({toks:cur,op:t.op});cur=[];}else cur.push(t);}
+  seqs.push({toks:cur,op:null});
+  for(const s of seqs){
+    if(!s.toks.length)continue;
+    const ok=await execPipeline(s.toks);
+    if(s.op==='&&'&&!ok)break;
+  }
+}
+async function execPipeline(toks){
+  const cmds=[[]];
+  for(const t of toks){if(t.op==='|')cmds.push([]);else cmds[cmds.length-1].push(t);}
+  let data=null;
+  for(let i=0;i<cmds.length;i++){
+    let ts=cmds[i];
+    if(!ts.length){println('구문 오류: 빈 명령','err');return false;}
+    let r=null;
+    const k=ts.findIndex(t=>t.op==='>'||t.op==='>>');
+    if(k>=0){
+      if(i!==cmds.length-1||!ts[k+1]||ts[k+1].op){println('구문 오류: 리다이렉션','err');return false;}
+      r={append:ts[k].op==='>>',file:ts[k+1].s};ts=ts.slice(0,k);
+    }
+    let args=[];
+    for(const t of ts){if(t.op){println('구문 오류: 예기치 않은 연산자','err');return false;}args.push(...expandGlob(t));}
+    if(args[0]==='sudo')args.shift();
+    const name=args[0];
+    if(!name){println('구문 오류: 명령이 없습니다','err');return false;}
+    const fn=CMDS[name];
+    if(!fn){println(name+': command not found  (help 로 명령어 확인)','err');return false;}
+    try{data=await fn(args.slice(1),data);}catch(e){println(e.message,'err');return false;}
+    if(data==null)data='';
+    if(i===cmds.length-1){
+      if(r){try{writeFile(abs(r.file),data+(data===''||data.endsWith('\n')?'':'\n'),r.append);}catch(e){println(e.message,'err');return false;}}
+      else if(data!=='')printBlock(data.replace(/\n$/,''));
+    }
+  }
+  return true;
+}
+const pf=a=>{const f=[],p=[];for(const x of a){if(/^-[a-zA-Z]+$/.test(x))f.push(...x.slice(1));else p.push(x);}return{f,p};};
+const srcText=(files,inp)=>files.length?files.map(ftext).join(''):(inp==null?'':inp);
+
+/* ---------- 서비스 / 방화벽 ---------- */
+const SVC={sshd:22,apache2:80,telnetd:23};
+const svcName=s=>(s||'').replace(/\.service$/,'').replace(/^ssh$/,'sshd').replace(/^apache$/,'apache2').replace(/^telnet$/,'telnetd');
+function listening(){
+  const r=[];
+  for(const k of Object.keys(SVC)){if(S.services[k]==='active')r.push({port:SVC[k],svc:k});}
+  return r;
+}
+
+/* ---------- 정적 분석(audit) ---------- */
+const AUDIT_RULES=[
+  {re:/(password|passwd|secret|api[_-]?key|token)\w*\s*=\s*["'][^"']+["']/i,msg:'하드코딩된 비밀값 — 환경변수/시크릿 매니저로 분리'},
+  {re:/["']\s*\+\s*\w+\s*\+\s*["']|["']\s*\+\s*(name|pw|user|id|input)\b|f["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*\{/i,msg:'SQL 문자열 연결/보간 — SQL 인젝션 위험, 파라미터화 쿼리 사용'},
+  {re:/debug\s*=\s*True/,msg:'운영 환경 debug=True — 내부 정보 노출'},
+  {re:/\beval\(|\bexec\(/,msg:'eval/exec 사용 — 임의 코드 실행 위험'},
+  {re:/^\s*PermitRootLogin\s+yes/i,msg:'root 직접 로그인 허용 — no 로 변경'},
+  {re:/^\s*PasswordAuthentication\s+yes/i,msg:'비밀번호 인증 허용 — 키 인증 권장(no)'},
+  {re:/chmod\s+(-R\s+)?777/,msg:'chmod 777 — 과도한 권한'}
+];
+
+/* ---------- 명령어 ---------- */
+const HELP=`[파일/탐색] ls [-al] cd pwd cat head tail tree find mkdir touch cp mv rm [-r] chmod
+[텍스트]   echo grep [-invcr] wc [-lwc] sort [-rnu] uniq [-c] cut -d -f awk '{print $N}' sed [-i] 's/a/b/g'
+[인코딩]   base64 [-d] rot13 sha256sum
+[편집]     edit <파일> (nano/vim 별칭)   리다이렉션 > >>   파이프 |   ; &&
+[시스템]   whoami id date uname ps ss(netstat) systemctl <status|start|stop|restart> <svc>
+[방화벽]   ufw status | ufw deny from <ip> | ufw deny <port> | ufw allow <port> | ufw delete <번호>
+[분석]     audit <파일> (정적 취약점 점검)
+[파일교환] upload (브라우저→~/uploads)   download <파일>   export (진행기록 JSON)
+[게임]     missions mission <n> hint check submit <FLAG> status defend soc tutorial save reset clear history
+Tab=자동완성  ↑↓=기록`;
+
+const CMDS={
+  help:()=>HELP,
+  clear:()=>{screenEl.innerHTML='';},
+  history:()=>S.history.map((h,i)=>String(i+1).padStart(4)+'  '+h).join('\n'),
+  whoami:()=>S.user,
+  id:()=>'uid=1000('+S.user+') gid=1000('+S.user+') groups=1000('+S.user+'),27(sudo)',
+  date:()=>new Date().toLocaleString('ko-KR'),
+  uname:a=>'Linux srv01 6.1.0-sim #1 SMP x86_64 GNU/Linux (virtual)',
+  pwd:()=>S.cwd,
+  echo:a=>a.join(' '),
+  cd:a=>{const p=a[0]?abs(a[0]):homeDir();const n=node(p);if(!n)throw new Error('cd: '+a[0]+': No such file or directory');if(n.t!=='d')throw new Error('cd: '+a[0]+': Not a directory');S.cwd=p;updateUI();},
+  ls:a=>{
+    const{f,p}=pf(a),all=f.includes('a'),lg=f.includes('l'),ts=p.length?p:['.'],out=[];
+    const fmt=(name,n)=>lg?((n.t==='d'?'d':'-')+permStr(n.m)+' '+(n.o||'root').padEnd(6)+' '+String(n.t==='d'?4096:n.d.length).padStart(6)+' '+name+(n.t==='d'?'/':'')):name+(n.t==='d'?'/':'');
+    ts.forEach(t=>{
+      const n=node(abs(t));if(!n)throw new Error("ls: cannot access '"+t+"': No such file or directory");
+      if(ts.length>1)out.push(t+':');
+      if(n.t==='f')out.push(fmt(t,n));
+      else{
+        let names=Object.keys(n.c).sort();if(!all)names=names.filter(x=>!x.startsWith('.'));
+        if(all&&lg){out.push(fmt('.',n),fmt('..',n));}
+        const l=names.map(x=>fmt(x,n.c[x]));
+        if(lg)out.push(...l);else if(l.length)out.push(l.join('  '));
+      }
+      if(ts.length>1)out.push('');
+    });
+    return out.join('\n').replace(/\n+$/,'');
+  },
+  cat:(a,inp)=>{const{p}=pf(a);if(!p.length&&inp==null)throw new Error('cat: 파일을 지정하세요');return srcText(p,inp);},
+  head:(a,inp)=>{let n=10;const fs=[];for(let i=0;i<a.length;i++){if(a[i]==='-n')n=+a[++i];else if(/^-\d+$/.test(a[i]))n=-a[i];else fs.push(a[i]);}return lines(srcText(fs,inp)).slice(0,n).join('\n');},
+  tail:(a,inp)=>{let n=10;const fs=[];for(let i=0;i<a.length;i++){if(a[i]==='-n')n=+a[++i];else if(/^-\d+$/.test(a[i]))n=-a[i];else fs.push(a[i]);}const l=lines(srcText(fs,inp));return l.slice(Math.max(0,l.length-n)).join('\n');},
+  mkdir:a=>{const{f,p}=pf(a);if(!p.length)throw new Error('mkdir: 경로 필요');p.forEach(x=>{const ap=abs(x);if(node(ap)&&!f.includes('p'))throw new Error("mkdir: '"+x+"': File exists");if(f.includes('p'))mkdirp(ap);else{const{dir,name}=parentOf(ap);if(!dir||dir.t!=='d')throw new Error("mkdir: '"+x+"': No such file or directory");dir.c[name]=D();}});},
+  touch:a=>{a.forEach(x=>{const ap=abs(x);if(!node(ap))writeFile(ap,'');});},
+  rm:a=>{const{f,p}=pf(a);if(!p.length)throw new Error('rm: 경로 필요');p.forEach(x=>{const ap=abs(x);if(ap==='/')throw new Error('rm: 루트는 삭제할 수 없습니다');const n=node(ap);if(!n){if(f.includes('f'))return;throw new Error("rm: cannot remove '"+x+"': No such file or directory");}if(n.t==='d'&&!f.includes('r'))throw new Error("rm: cannot remove '"+x+"': Is a directory (-r 필요)");const{dir,name}=parentOf(ap);delete dir.c[name];if(S.cwd===ap||S.cwd.startsWith(ap+'/'))S.cwd=homeDir();});},
+  cp:a=>{const{f,p}=pf(a);if(p.length<2)throw new Error('cp: 원본과 대상 필요');const src=node(abs(p[0]));if(!src)throw new Error('cp: '+p[0]+': No such file or directory');if(src.t==='d'&&!f.includes('r'))throw new Error('cp: -r 필요');let dst=abs(p[1]);const dn=node(dst);if(dn&&dn.t==='d')dst=dst+'/'+p[0].split('/').pop();const{dir,name}=parentOf(dst);if(!dir||dir.t!=='d')throw new Error('cp: 대상 경로 없음');dir.c[name]=clone(src);},
+  mv:a=>{if(a.length<2)throw new Error('mv: 원본과 대상 필요');const sp=abs(a[0]),src=node(sp);if(!src)throw new Error('mv: '+a[0]+': No such file or directory');let dst=abs(a[1]);const dn=node(dst);if(dn&&dn.t==='d')dst=dst+'/'+a[0].split('/').pop();const{dir,name}=parentOf(dst);if(!dir||dir.t!=='d')throw new Error('mv: 대상 경로 없음');const sp2=parentOf(sp);dir.c[name]=src;if(sp2.dir!==dir||sp2.name!==name)delete sp2.dir.c[sp2.name];},
+  chmod:a=>{
+    const{f}=pf(a.filter(x=>!/^[ugoa]*[+-][rwx]+$/.test(x)&&!/^[0-7]{3}$/.test(x)));
+    const rest=a.filter(x=>!(/^-[a-zA-Z]+$/.test(x)));
+    if(rest.length<2)throw new Error('사용법: chmod [-R] <모드> <파일>  (예: chmod 750 file, chmod o-w file)');
+    const mode=rest[0],rec=a.includes('-R');
+    const apply=n=>{
+      if(/^[0-7]{3}$/.test(mode)){n.m=mode;return;}
+      const mm=mode.match(/^([ugoa]*)([+-])([rwx]+)$/);if(!mm)throw new Error('chmod: 잘못된 모드: '+mode);
+      let who=mm[1]||'a';if(who.includes('a'))who='ugo';
+      const bits=[...mm[3]].reduce((s,c)=>s|({r:4,w:2,x:1}[c]),0);
+      const d=[...n.m].map(Number);
+      ['u','g','o'].forEach((w,i)=>{if(who.includes(w))d[i]=mm[2]==='+'?(d[i]|bits):(d[i]&~bits);});
+      n.m=d.join('');
+    };
+    rest.slice(1).forEach(x=>{const n=node(abs(x));if(!n)throw new Error("chmod: cannot access '"+x+"': No such file or directory");if(rec)walk(abs(x),n,(p,nn)=>apply(nn));else apply(n);});
+  },
+  find:a=>{
+    let start='.',name=null,type=null,perm=null;
+    for(let i=0;i<a.length;i++){if(a[i]==='-name')name=a[++i];else if(a[i]==='-type')type=a[++i];else if(a[i]==='-perm')perm=a[++i];else if(!a[i].startsWith('-'))start=a[i];}
+    const sn=node(abs(start));if(!sn)throw new Error("find: '"+start+"': No such file or directory");
+    const re=name?new RegExp('^'+name.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.')+'$'):null;
+    const out=[];
+    walk(abs(start),sn,(p,n)=>{
+      if(type==='f'&&n.t!=='f')return;if(type==='d'&&n.t!=='d')return;
+      if(re&&!re.test(p.split('/').pop()))return;
+      if(perm){if(/^-?(o\+w|002)$/.test(perm)||/^\/002$/.test(perm)){if(!(parseInt(n.m.slice(-1),10)&2))return;}else if(/^[0-7]{3}$/.test(perm)){if(n.m!==perm)return;}}
+      out.push(p==='/'?'/':(start.startsWith('/')||start==='~'?p:(start==='.'?'.'+p.slice(S.cwd.length):p)));
+    });
+    return out.join('\n');
+  },
+  tree:a=>{
+    const st=a[0]?abs(a[0]):S.cwd;const root=node(st);if(!root)throw new Error('tree: 경로 없음');
+    const out=[st];
+    const rec=(n,pre,d)=>{if(n.t!=='d'||d>5)return;const ks=Object.keys(n.c).sort();ks.forEach((k,i)=>{const last=i===ks.length-1;out.push(pre+(last?'└── ':'├── ')+k+(n.c[k].t==='d'?'/':''));rec(n.c[k],pre+(last?'    ':'│   '),d+1);});};
+    rec(root,'',0);return out.join('\n');
+  },
+  grep:(a,inp)=>{
+    const f=new Set(),p=[];for(const x of a){if(/^-[a-zA-Z]+$/.test(x))[...x.slice(1)].forEach(c=>f.add(c));else p.push(x);}
+    if(!p.length)throw new Error('사용법: grep [-invcr] <패턴> [파일...]');
+    let re;try{re=new RegExp(p[0],f.has('i')?'i':'');}catch(e){throw new Error('grep: 잘못된 정규식');}
+    let files=p.slice(1);
+    const srcs=[];
+    if(f.has('r')){const base=files.length?files:['.'];base.forEach(b=>{const n=node(abs(b));if(!n)throw new Error('grep: '+b+': No such file or directory');walk(abs(b),n,(pp,nn)=>{if(nn.t==='f')srcs.push({name:pp,text:nn.d});});});}
+    else if(files.length)files.forEach(x=>srcs.push({name:x,text:ftext(x)}));
+    else srcs.push({name:null,text:inp==null?'':inp});
+    const multi=srcs.length>1;const out=[];let count=0;
+    srcs.forEach(s=>{let c=0;lines(s.text).forEach((l,i)=>{const hit=re.test(l);if(hit!==f.has('v')){c++;if(!f.has('c'))out.push((multi&&s.name?s.name+':':'')+(f.has('n')?(i+1)+':':'')+l);}});count+=c;if(f.has('c'))out.push((multi&&s.name?s.name+':':'')+c);});
+    return out.join('\n');
+  },
+  wc:(a,inp)=>{const{f,p}=pf(a);const t=srcText(p,inp);const l=lines(t).length,w=(t.trim()?t.trim().split(/\s+/).length:0),c=t.length;if(f.includes('l'))return String(l);if(f.includes('w'))return String(w);if(f.includes('c'))return String(c);return l+' '+w+' '+c;},
+  sort:(a,inp)=>{const{f,p}=pf(a);let l=lines(srcText(p,inp));if(f.includes('n'))l.sort((x,y)=>(parseFloat(x.trim())||0)-(parseFloat(y.trim())||0));else l.sort();if(f.includes('r'))l.reverse();if(f.includes('u'))l=l.filter((x,i)=>l.indexOf(x)===i);return l.join('\n');},
+  uniq:(a,inp)=>{const{f,p}=pf(a);const l=lines(srcText(p,inp)),out=[];l.forEach(x=>{const last=out[out.length-1];if(last&&last.t===x)last.n++;else out.push({t:x,n:1});});return out.map(o=>f.includes('c')?String(o.n).padStart(7)+' '+o.t:o.t).join('\n');},
+  cut:(a,inp)=>{let d='\t',fl=null;const fs=[];for(let i=0;i<a.length;i++){if(a[i]==='-d')d=a[++i];else if(a[i].startsWith('-d'))d=a[i].slice(2);else if(a[i]==='-f')fl=a[++i];else if(a[i].startsWith('-f'))fl=a[i].slice(2);else fs.push(a[i]);}if(!fl)throw new Error('사용법: cut -d <구분자> -f <필드> [파일]');const idx=fl.split(',').map(x=>+x-1);return lines(srcText(fs,inp)).map(l=>{const p=l.split(d);return idx.map(i=>p[i]||'').join(d);}).join('\n');},
+  awk:(a,inp)=>{
+    let sep=null;const r=[];for(let i=0;i<a.length;i++){if(a[i]==='-F')sep=a[++i];else if(a[i].startsWith('-F'))sep=a[i].slice(2);else r.push(a[i]);}
+    const m=(r[0]||'').match(/\{\s*print\s*(.*?)\s*\}/);if(!m)throw new Error("awk: 지원 형식: awk [-F구분자] '{print $1, $NF}' [파일]");
+    const ex=m[1]===''?['$0']:m[1].split(/\s*,\s*/);
+    return lines(r.length>1?r.slice(1).map(ftext).join(''):(inp==null?'':inp)).map(l=>{const f=sep?l.split(sep):l.trim().split(/\s+/);return ex.map(e=>{if(e==='$0')return l;if(e==='$NF')return f[f.length-1]||'';const mm=e.match(/^\$(\d+)$/);if(mm)return f[+mm[1]-1]||'';return e.replace(/^"|"$/g,'');}).join(' ');}).join('\n');
+  },
+  sed:(a,inp)=>{
+    const inplace=a.includes('-i');const r=a.filter(x=>x!=='-i');
+    const m=(r[0]||'').match(/^s(.)(.*?)\1(.*?)\1([gi]*)$/);if(!m)throw new Error("sed: 지원 형식: sed [-i] 's/찾을것/바꿀것/[g]' <파일>");
+    let re;try{re=new RegExp(m[2],m[4]);}catch(e){throw new Error('sed: 잘못된 정규식');}
+    const conv=t=>t.split('\n').map(l=>l.replace(re,m[3])).join('\n');
+    if(inplace){if(r.length<2)throw new Error('sed -i: 파일 필요');r.slice(1).forEach(f=>{const n=node(abs(f));if(!n||n.t!=='f')throw new Error('sed: '+f+': No such file or directory');n.d=conv(n.d);});return'';}
+    return conv(srcText(r.slice(1),inp)).replace(/\n$/,'');
+  },
+  base64:(a,inp)=>{
+    const dec=a.includes('-d')||a.includes('--decode');const fs=a.filter(x=>!x.startsWith('-'));const t=srcText(fs,inp);
+    if(dec){try{return atob(t.replace(/\s+/g,''));}catch(e){throw new Error('base64: 잘못된 입력');}}
+    try{return btoa(t.replace(/\n$/,''));}catch(e){throw new Error('base64: ASCII 텍스트만 지원');}
+  },
+  rot13:(a,inp)=>rot13(a.length?srcText(a,inp):(inp==null?'':inp)),
+  sha256sum:(a,inp)=>{if(!a.length)return sha256(inp==null?'':inp)+'  -';return a.map(f=>sha256(ftext(f))+'  '+f).join('\n');},
+  ps:()=>{
+    const r=['  PID USER     COMMAND','    1 root     /sbin/init'];
+    if(S.services.sshd==='active')r.push('  412 root     /usr/sbin/sshd -D');
+    if(S.services.apache2==='active')r.push('  588 www-data /usr/sbin/apache2 -k start');
+    if(S.services.telnetd==='active')r.push('  631 root     /usr/sbin/telnetd -debug 23');
+    r.push(' 1204 '+S.user.padEnd(8)+' -bash');return r.join('\n');
+  },
+  ss:()=>{const r=['State   Local Address:Port   Process'];listening().forEach(x=>r.push('LISTEN  0.0.0.0:'+String(x.port).padEnd(14)+'users:(("'+x.svc+'"))'));return r.join('\n');},
+  netstat:a=>CMDS.ss(a),
+  systemctl:a=>{
+    const act=a[0],svc=svcName(a[1]);
+    if(!act||!a[1])throw new Error('사용법: systemctl <status|start|stop|restart> <sshd|apache2|telnetd>');
+    if(!(svc in S.services))throw new Error('Unit '+a[1]+'.service could not be found.');
+    if(act==='status')return'● '+svc+'.service\n   Active: '+(S.services[svc]==='active'?'active (running)':'inactive (dead)');
+    if(act==='stop'){S.services[svc]='inactive';return svc+' 중지됨';}
+    if(act==='start'){S.services[svc]='active';return svc+' 시작됨';}
+    if(act==='restart'){
+      S.services[svc]='active';
+      if(svc==='sshd'){if(sshSecure()){S.sshdRestarted=true;return'sshd 재시작 완료 — 설정 검증 OK (새 설정 적용됨)';}return'sshd 재시작 완료 — ⚠ 여전히 위험한 설정이 적용되어 있습니다.';}
+      return svc+' 재시작됨';
+    }
+    if(act==='enable'||act==='disable')return svc+' '+act+'d';
+    throw new Error('알 수 없는 동작: '+act);
+  },
+  ufw:a=>{
+    const ipRe=/^\d{1,3}(\.\d{1,3}){3}$/;
+    if(!a.length||a[0]==='status'){return'Status: active\n\n'+(S.ufw.length?S.ufw.map((r,i)=>'['+(i+1)+'] '+r).join('\n'):'(규칙 없음)');}
+    const act=a[0];
+    if(act==='delete'){const i=+a[1]-1;if(!(i>=0&&i<S.ufw.length))throw new Error('ufw: 잘못된 규칙 번호');const r=S.ufw.splice(i,1)[0];return'삭제됨: '+r;}
+    if(act==='deny'||act==='allow'){
+      let rule;
+      if(a[1]==='from'){if(!ipRe.test(a[2]||''))throw new Error('ufw: 올바른 IP 형식이 아닙니다');rule=act+' from '+a[2];}
+      else{const p=(a[1]||'').replace(/\/tcp$/,'');if(!/^\d+$/.test(p))throw new Error('사용법: ufw deny from <ip> | ufw deny <port>');rule=act+' '+p;}
+      if(!S.ufw.includes(rule))S.ufw.push(rule);return'규칙 추가됨: '+rule;
+    }
+    throw new Error('사용법: ufw status | ufw deny from <ip> | ufw deny <port> | ufw allow ... | ufw delete <번호>');
+  },
+  audit:a=>{
+    if(!a.length)throw new Error('사용법: audit <파일>');
+    const out=['[audit] '+a[0]+' 정적 점검 결과'];let c=0;
+    lines(ftext(a[0])).forEach((l,i)=>{AUDIT_RULES.forEach(r=>{if(r.re.test(l)){c++;out.push('  L'+(i+1)+': '+l.trim());out.push('       ⚠ '+r.msg);}});});
+    out.push(c?('총 '+c+'건의 잠재 취약점 발견'):'발견된 취약 패턴 없음 ✔');return out.join('\n');
+  },
+  edit:a=>editFile(a[0]),
+  nano:a=>editFile(a[0]),vim:a=>editFile(a[0]),vi:a=>editFile(a[0]),
+  upload:()=>{$('fileInput').click();return'파일 선택 창을 열었습니다. 업로드된 파일은 ~/uploads 에 저장됩니다.';},
+  download:a=>{
+    if(!a.length)throw new Error('사용법: download <파일>');
+    const n=node(abs(a[0]));if(!n)throw new Error(a[0]+': No such file or directory');if(n.t!=='f')throw new Error('download: 파일만 가능합니다');
+    dl(a[0].split('/').pop()||'file.txt',n.d,'text/plain');return a[0]+' 다운로드를 시작했습니다.';
+  },
+  export:()=>{save();dl('hackhub_progress_'+S.user+'.json',JSON.stringify(S,null,1),'application/json');return'진행 기록 JSON 을 내려받았습니다.';},
+  save:()=>{save();return'저장되었습니다. (브라우저 localStorage)';},
+  reset:()=>{if(confirm('모든 진행 기록과 가상 파일을 삭제하고 처음부터 시작할까요?')){try{localStorage.removeItem(SAVE_KEY);}catch(e){}location.reload();}return'취소됨';},
+  tutorial:()=>{openTut(0);},
+  missions:()=>{const o=['=== 미션 목록 (mission <번호> 로 브리핑) ==='];MISSIONS.forEach(m=>o.push('  ['+m.id+'] '+m.title+'  - '+(S.done[m.id]?'✅ 완료':(m.id===S.cur?'▶ 진행중':(m.id<S.cur?'열림':'🔒 잠김')))));return o.join('\n');},
+  mission:a=>{const id=+(a[0]||S.cur);const m=MISSIONS[id-1];if(!m)throw new Error('해당 번호의 미션이 없습니다.');if(id>S.cur)throw new Error('아직 잠긴 미션입니다. 이전 미션을 먼저 완료하세요.');return'--- 미션 '+id+': '+m.title+' ---\n'+m.brief+(m.submit?'\n\n제출: submit FLAG{...}':'');},
+  hint:()=>{
+    const m=MISSIONS[S.cur-1];if(S.done[m.id]&&S.cur>=6&&m.id===6)return'모든 미션을 완료했습니다!';
+    const i=S.hints[m.id]||0;if(i>=m.hints.length)return'더 이상 힌트가 없습니다.';
+    S.hints[m.id]=i+1;S.score=Math.max(0,S.score-10);updateUI();return'💡 SENTINEL 힌트 '+(i+1)+'/'+m.hints.length+' (−10점)\n'+m.hints[i];
+  },
+  check:()=>{
+    const m=MISSIONS[S.cur-1];const c=m.check();
+    let o='=== 미션 '+m.id+' 체크리스트 ===\n'+c.map(x=>(x.ok?'  ✅ ':'  ⬜ ')+x.l).join('\n');
+    if(m.id===3&&sshSecure()&&!S.sshdRestarted)o+='\n  → 설정은 맞습니다. systemctl restart sshd 로 적용하세요.';
+    if(m.submit&&!S.done[m.id])o+='\n  → 플래그를 찾았으면 submit FLAG{...}';
+    return o;
+  },
+  submit:a=>{
+    const f=(a[0]||'').trim();if(!f)throw new Error('사용법: submit FLAG{...}');
+    const m=MISSIONS.find(x=>(x.submit||FLAGS[x.id])===f);
+    if(!m)return'❌ 틀린 플래그입니다.';
+    if(S.done[m.id])return'이미 완료한 미션의 플래그입니다.';
+    if(m.id>S.cur)throw new Error('아직 잠긴 미션의 플래그입니다.');
+    if(!m.submit)return'이 미션은 플래그 제출이 아니라 실제 조치(check 참고)로 완료됩니다.';
+    if(m.id===1)S.m1ok=true;if(m.id===5)S.m5ok=true;
+    finish(m.id);return'';
+  },
+  status:()=>'점수: '+S.score+' | 완료 미션: '+MISSIONS.filter(m=>S.done[m.id]).length+'/6 | 현재 미션: '+S.cur+' | 방화벽 규칙 '+S.ufw.length+'개 | 서비스: '+Object.keys(S.services).map(k=>k+'='+S.services[k]).join(', '),
+  defend:()=>{defStart();},
+  soc:()=>{
+    let o='=== SOC 대시보드 ===\n방어전: '+(DEF.on?('진행중 ('+DEF.tick+'/'+DEF_TOTAL+') 무결성 '+DEF.integ+'%'):'대기')+'\n공격자: RED-AI "Mantis" (적응형 규칙 기반 AI)\n방화벽 차단 IP: '+(S.ufw.filter(r=>r.startsWith('deny from')).map(r=>r.slice(10)).join(', ')||'없음')+'\n점검 팁: ss -tlnp | find / -perm -o+w | audit ~/webapp/app.py | cat /etc/ssh/sshd_config | tail /var/log/ids.log';
+    return o;
+  }
+};
+
+/* ---------- 파일 편집기 / 업로드 / 다운로드 ---------- */
+let editPath=null,editResolve=null;
+function editFile(p){
+  if(!p)throw new Error('사용법: edit <파일>');
+  const ap=abs(p);let n=node(ap);if(n&&n.t==='d')throw new Error(p+': Is a directory');
+  editPath=ap;$('editTitle').textContent='edit  '+ap;$('editor').value=n?n.d:'';
+  $('editOverlay').classList.add('show');setTimeout(()=>$('editor').focus(),30);
+  return new Promise(res=>{editResolve=res;});
+}
+function closeEdit(saveIt){
+  if(!editResolve)return;
+  let msg='';
+  if(saveIt){try{writeFile(editPath,$('editor').value,false);msg=editPath+' 저장됨';}catch(e){msg=e.message;}}else msg='편집 취소';
+  $('editOverlay').classList.remove('show');const r=editResolve;editResolve=null;r(msg);input.focus();
+}
+function dl(name,text,type){const b=new Blob([text],{type:type+';charset=utf-8'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove();},500);}
+$('fileInput').addEventListener('change',e=>{
+  const files=[...e.target.files];e.target.value='';
+  files.forEach(f=>{
+    if(f.size>1024*1024){println('❌ '+f.name+': 1MB 이하 파일만 업로드할 수 있습니다.','err');return;}
+    const rd=new FileReader();
+    rd.onload=()=>{
+      const t=String(rd.result);
+      if(t.includes('\u0000')){println('❌ '+f.name+': 바이너리 파일은 지원하지 않습니다 (텍스트 전용).','err');return;}
+      const nm=f.name.replace(/[\/\\]/g,'_');putFile(homeDir()+'/uploads/'+nm,t);
+      println('⬆ 업로드 완료: ~/uploads/'+nm+' ('+f.size+' bytes) — 가상 FS 안에서만 존재합니다.','ok');save();
+    };
+    rd.onerror=()=>println('❌ '+f.name+' 읽기 실패','err');
+    rd.readAsText(f);
+  });
+});
+
+/* ---------- AI 방어전 (RED-AI "Mantis") ---------- */
+const DEF_TOTAL=24;
+const DEF={on:false,tick:0,integ:100,timer:null,ip:null,active:[],pool:['203.0.113.201','198.51.100.66','192.0.2.150','203.0.113.9','198.51.100.231','192.0.2.77','203.0.113.188','198.51.100.4']};
+const VEC={
+  telnet:{n:'Telnet(23) 노출',open:()=>S.services.telnetd==='active'&&!ufwHasPort(23),s:['포트 23(telnet) 열림 확인 — 스캔 중','기본 계정으로 telnet 로그인 시도','telnet 세션 확보 → 내부 쉘 획득']},
+  upload:{n:'업로드 디렉터리 권한',open:()=>wwr('/var/www/uploads'),s:['/var/www/uploads 쓰기 가능 여부 탐색','웹셸(shell.php) 업로드 시도','웹셸 실행 → 서버 장악']},
+  backup:{n:'백업 스크립트 변조',open:()=>wwr('/opt/backup.sh'),s:['/opt/backup.sh 권한 탐색 (cron 실행 대상)','스크립트에 악성 명령 삽입 시도','cron 이 변조된 스크립트 실행 → 권한 상승']},
+  sqli:{n:'웹 로그인 SQL 인젝션',open:()=>{const c=appChecks();return!(c[0].ok&&c[1].ok);},s:['/login 폼 인젝션 포인트 탐지','OR 1=1 페이로드 시도','인증 우회 성공 → 사용자 DB 유출']},
+  ssh:{n:'SSH 약한 설정',open:()=>sshWeak(),s:['sshd 설정 약점 탐색 (root/비밀번호 로그인)','root 비밀번호 사전 대입 시도','SSH 로그인 성공 → 쉘 획득']}
+};
+function appendLog(line){const n=node('/var/log/ids.log');if(n&&n.t==='f')n.d+=line+'\n';}
+function dlog(msg,cls){appendLog('['+tstamp()+'] '+msg);println(msg,cls);}
+function defUI(){
+  $('integWrap').style.display=DEF.on?'flex':'none';
+  const v=Math.max(0,DEF.integ);$('integFill').style.width=v+'%';$('integFill').style.background=v>60?'var(--fg)':(v>30?'var(--accent2)':'var(--accent)');
+  $('integTxt').textContent=v+'%';$('defTime').textContent=DEF.tick+'/'+DEF_TOTAL;
+}
+function defStart(){
+  if(S.cur<6&&!S.done[5])throw new Error('방어전은 미션 6 에서 열립니다. (미션 5 완료 후)');
+  if(DEF.on)throw new Error('이미 방어전이 진행 중입니다.');
+  DEF.on=true;DEF.tick=0;DEF.integ=100;DEF.active=[];
+  const free=DEF.pool.filter(p=>!ufwBlocksIp(p));DEF.ip=free[Math.floor(Math.random()*free.length)]||DEF.pool[0];
+  printBlock('⚔️  방어전 시작! RED-AI "Mantis" 가 srv01 을 공격합니다.\n   약 '+Math.round(DEF_TOTAL*2.5)+'초 동안 무결성을 지키세요. (경보를 읽고 즉시 패치/차단)','warn');
+  dlog('🤖 [RED-AI] 목표 srv01 — 공격 개시, 출발 IP '+DEF.ip,'warn');
+  defUI();DEF.timer=setInterval(defTick,2500);
+}
+function defStop(){clearInterval(DEF.timer);DEF.timer=null;DEF.on=false;defUI();}
+function defTick(){
+  if(!DEF.on)return;
+  DEF.tick++;
+  if(ufwBlocksIp(DEF.ip)){
+    const free=DEF.pool.filter(p=>!ufwBlocksIp(p));
+    if(free.length){DEF.ip=free[Math.floor(Math.random()*free.length)];dlog('🤖 [RED-AI] 차단 감지 → 우회 IP '+DEF.ip+' 로 전환, 재공격','warn');}
+    else dlog('🤖 [RED-AI] 사용 가능한 공격 IP 소진 — 플러드 중단','ok');
+  }
+  if(!ufwBlocksIp(DEF.ip)){DEF.integ-=2;dlog('🚨 [IDS] '+DEF.ip+' 에서 SYN 플러드 감지 (무결성 -2)','err');}
+  for(const a of DEF.active.slice()){
+    const v=VEC[a.k];
+    if(!v.open()){dlog('✅ [IDS] "'+v.n+'" 공격 차단됨 — RED-AI 실패 (+20점)','ok');DEF.active.splice(DEF.active.indexOf(a),1);S.score+=20;continue;}
+    a.stage++;
+    if(a.stage<=2)dlog('⚠ [IDS] '+DEF.ip+' → '+v.s[a.stage-1]+'  ['+v.n+']','warn');
+    else{const d=a.stage===3?12:(a.stage%2===0?6:0);if(d){DEF.integ-=d;dlog('💥 [BREACH] '+v.s[2]+'  (무결성 -'+d+')','err');}}
+  }
+  if(DEF.tick%3===1&&DEF.active.length<2){
+    const cand=Object.keys(VEC).filter(k=>VEC[k].open()&&!DEF.active.some(a=>a.k===k));
+    if(cand.length)DEF.active.push({k:cand[Math.floor(Math.random()*cand.length)],stage:0});
+  }
+  if(DEF.tick%4===2){
+    const closed=Object.keys(VEC).filter(k=>!VEC[k].open()&&!DEF.active.some(a=>a.k===k));
+    if(closed.length){const k=closed[Math.floor(Math.random()*closed.length)];dlog('🛡 [IDS] "'+VEC[k].n+'" 공격 시도 → 이미 방어됨','hint');}
+  }
+  defUI();updateUI();
+  if(DEF.integ<=0){defStop();dlog('💀 서버가 장악되었습니다. 방어 실패 — 로그를 분석하고 취약점을 패치한 뒤 defend 로 재도전하세요.','err');return;}
+  if(DEF.tick>=DEF_TOTAL){
+    defStop();dlog('🏆 방어 성공! 서버 무결성 '+DEF.integ+'% 로 버텼습니다.','warn');
+    S.score+=Math.floor(DEF.integ/2);
+    if(!S.done[6])finish(6);else{println('(이미 클리어한 미션이므로 보너스 점수만 반영)','hint');updateUI();save();}
+  }
+}
+
+/* ---------- UI ---------- */
+function shortCwd(){const h=homeDir();return S.cwd===h?'~':(S.cwd.startsWith(h+'/')?'~'+S.cwd.slice(h.length):S.cwd);}
+function updateUI(){
+  $('scoreVal').textContent=S.score;
+  $('missionProg').textContent=MISSIONS.filter(m=>S.done[m.id]).length+'/6';
+  const ml=$('missionList');ml.innerHTML='';
+  MISSIONS.forEach(m=>{const li=document.createElement('li');li.textContent=(S.done[m.id]?'✅ ':(m.id===S.cur?'▶ ':(m.id<S.cur?'⬜ ':'🔒 ')))+m.id+'. '+m.title;li.style.color=S.done[m.id]?'var(--fg)':(m.id===S.cur?'var(--accent2)':'var(--muted)');ml.appendChild(li);});
+  const fl=$('flagList');fl.innerHTML='';
+  if(!S.flags.length){const li=document.createElement('li');li.textContent='(없음)';li.style.color='var(--muted)';fl.appendChild(li);}
+  S.flags.forEach(f=>{const li=document.createElement('li');li.textContent='🚩 '+f;li.style.color='var(--fg-dim)';li.style.wordBreak='break-all';fl.appendChild(li);});
+  promptEl.textContent=S.user+'@srv01:'+shortCwd()+'$';
+}
+
+/* ---------- 튜토리얼 ---------- */
+const TUT=[
+ {t:'1/8  환영합니다 — HACKHUB LAB',h:`<p>이 랩은 <b>브라우저 안에서만</b> 돌아가는 가상 리눅스 서버(srv01)입니다. 파일·로그·공격자 모두 가상이며 실제 네트워크 활동은 없습니다.</p>
+<p>목표는 <b>공격이 아니라 방어</b>입니다. 로그를 분석하고, 설정을 강화하고, 코드를 패치하고, 마지막에는 AI 레드팀의 공격을 실시간으로 막아냅니다.</p>
+<p>총 6개 미션: 숨은 파일 → 로그 분석 → SSH 하드닝 → 코드 취약점 패치 → 포렌식 디코딩 → AI 방어전.</p>`},
+ {t:'2/8  화면 구성',h:`<p><b>가운데 터미널</b>에 명령어를 입력합니다. <code>Tab</code> 자동완성, <code>↑ ↓</code> 명령 기록.</p>
+<p><b>상단 바</b>: 점수, 미션 진행도, 방어전 중에는 서버 <b>무결성 게이지</b>가 나타납니다. 📖 튜토리얼 / ⬆ 업로드 버튼도 여기에 있습니다.</p>
+<p><b>오른쪽 패널</b>(PC): 미션 목록, 획득한 플래그, 도구 버튼. 모바일에서는 <code class="try" data-c="missions">missions</code> 명령을 쓰세요.</p>
+<p>아래 파란 명령을 클릭하면 입력창에 자동으로 채워집니다. 직접 해보세요 → <code class="try" data-c="help">help</code></p>`},
+ {t:'3/8  기본 리눅스 명령어',h:`<pre>ls -la          파일 목록(숨김 포함, 권한)
+cd ctf/m1       디렉터리 이동 (cd .. / cd ~)
+cat 파일         내용 보기
+find ~ -name "*.txt"
+tree ~          디렉터리 구조</pre>
+<p>가상 파일 시스템은 실제 FS처럼 <code>/etc</code>, <code>/var/log</code>, <code>/home/내이름</code> 이 있습니다. 변경 내용은 자동 저장됩니다.</p>
+<p>시도: <code class="try" data-c="ls -la">ls -la</code> <code class="try" data-c="tree ~">tree ~</code></p>`},
+ {t:'4/8  파이프와 로그 분석',h:`<p>명령의 출력을 <code>|</code> 로 다음 명령에 넘깁니다. 로그 분석의 기본 공식:</p>
+<pre>grep Failed /var/log/auth.log \\
+  | awk '{print $11}' | sort | uniq -c | sort -rn</pre>
+<p>→ 실패 로그만 추출 → IP 필드 뽑기 → 정렬 → 중복 집계 → 많은 순 정렬. 결과를 파일로 저장하려면 <code>&gt; result.txt</code> / <code>&gt;&gt;</code></p>
+<p>시도: <code class="try" data-c="grep -c Failed /var/log/auth.log">grep -c Failed /var/log/auth.log</code></p>`},
+ {t:'5/8  파일 수정과 패치',h:`<p>설정/코드를 고치는 방법 두 가지:</p>
+<pre>edit /etc/ssh/sshd_config          편집기 창이 열림 (Ctrl+S 저장)
+sed -i 's/yes/no/' 파일             한 줄 치환
+chmod 750 /var/www/uploads         권한 변경
+chmod o-w 파일                      "기타 사용자" 쓰기 제거</pre>
+<p><code>audit 파일</code> 은 하드코딩 비밀번호·SQL 문자열 연결·debug=True 같은 취약 패턴을 자동으로 짚어줍니다.</p>
+<p>서비스/방화벽: <code>systemctl restart sshd</code>, <code>ufw deny from 1.2.3.4</code>, <code>ss -tlnp</code></p>`},
+ {t:'6/8  업로드 · 다운로드 · 저장',h:`<p><b>업로드</b>: 상단 ⬆ 버튼 또는 <code class="try" data-c="upload">upload</code> → 내 PC의 텍스트 파일(1MB 이하)이 가상 FS의 <code>~/uploads</code> 로 들어옵니다. 로그·설정·코드를 가져와 분석해 보세요. (바이너리 파일 미지원)</p>
+<p><b>다운로드</b>: <code>download 파일명</code> → 가상 FS의 파일을 내 PC로 저장.</p>
+<p><b>진행 저장</b>: 모든 상태(파일, 점수, 미션, 방화벽, 서비스)는 이 브라우저에 <b>자동 저장</b>됩니다. <code>export</code> 로 JSON 백업, <code>reset</code> 으로 초기화.</p>`},
+ {t:'7/8  미션 진행 방법',h:`<pre>missions        목록 보기
+mission 2       브리핑
+hint            힌트 (−10점)
+check           현재 미션 체크리스트
+submit FLAG{..} 플래그 제출 (미션 1, 5)</pre>
+<p>미션 2·3·4는 <b>실제로 조치를 완료하면 자동 클리어</b>됩니다(예: 공격 IP 차단, 설정 수정). 막히면 <code>hint</code> 를 쓰되 점수가 깎이니 신중하게!</p>
+<p>첫 미션을 시작해 보세요 → <code class="try" data-c="mission 1">mission 1</code></p>`},
+ {t:'8/8  최종전: AI 방어전',h:`<p>미션 6에서 <code>defend</code> 를 입력하면 <b>RED-AI "Mantis"</b> 가 실시간으로 공격합니다.</p>
+<p>• IDS 경보가 단계별로 뜹니다: <b>정찰 → 침투 시도 → 장악(BREACH)</b><br>
+• 경보를 읽고 어떤 취약점인지 파악 → <b>즉시 패치</b>하면 공격이 실패합니다.<br>
+• SYN 플러드는 <code>ufw deny from IP</code> 로 막으세요. Mantis는 차단을 감지하면 <b>다른 IP로 우회</b>합니다.<br>
+• 방어전 전에 <code>ss -tlnp</code>, <code>find / -perm -o+w</code> 로 미리 점검해 두면 훨씬 유리합니다.</p>
+<p>※ Mantis와 SENTINEL(힌트)은 브라우저 안에서 도는 <b>규칙 기반 적응형 AI</b>이며 외부 AI 서비스를 호출하지 않습니다.</p>
+<p>준비되셨나요? 행운을 빕니다, 요원.</p>`}
+];
+let tutIdx=0;
+function openTut(i){tutIdx=i;renderTut();$('tutOverlay').classList.add('show');try{localStorage.setItem(TUT_KEY,'1');}catch(e){}}
+function renderTut(){
+  const p=TUT[tutIdx];$('tutTitle').textContent=p.t;$('tutBody').innerHTML=p.h;
+  $('tutPage').textContent=(tutIdx+1)+' / '+TUT.length;
+  $('tutPrev').style.visibility=tutIdx===0?'hidden':'visible';
+  $('tutNext').textContent=tutIdx===TUT.length-1?'완료 ✔':'다음 ▶';
+  $('tutBody').querySelectorAll('code.try').forEach(c=>c.addEventListener('click',()=>{closeTut();input.value=c.dataset.c;input.focus();}));
+}
+function closeTut(){$('tutOverlay').classList.remove('show');if(S)input.focus();}
+$('tutPrev').onclick=()=>{if(tutIdx>0){tutIdx--;renderTut();}};
+$('tutNext').onclick=()=>{if(tutIdx<TUT.length-1){tutIdx++;renderTut();}else closeTut();};
+$('tutClose').onclick=closeTut;
+
+/* ---------- 입력 처리 ---------- */
+let hIdx=0,busy=false;
+function complete(val){
+  const m=val.match(/^([\s\S]*?)(\S*)$/),pre=m[1],last=m[2],first=!pre.trim();let c;
+  if(first)c=Object.keys(CMDS).filter(x=>x.startsWith(last)).sort();
+  else{const i=last.lastIndexOf('/'),dp=i>=0?last.slice(0,i+1):'',base=last.slice(i+1);const dn=node(abs(dp||'.'));c=dn&&dn.t==='d'?Object.keys(dn.c).filter(n=>n.startsWith(base)).sort().map(n=>dp+n+(dn.c[n].t==='d'?'/':'')):[];}
+  return{pre,c,first};
+}
+input.addEventListener('keydown',async e=>{
+  if(busy&&e.key==='Enter'){e.preventDefault();return;}
+  if(e.key==='Enter'){
+    const val=input.value;input.value='';
+    println(promptEl.textContent+' '+val,'cmd');
+    if(val.trim()){S.history.push(val);}hIdx=S.history.length;
+    busy=true;
+    try{await execLine(val);}catch(err){println('내부 오류: '+err.message,'err');}
+    busy=false;evalMission();save();updateUI();input.focus();
+  }else if(e.key==='Tab'){
+    e.preventDefault();const r=complete(input.value);
+    if(r.c.length===1)input.value=r.pre+r.c[0]+(r.first||!r.c[0].endsWith('/')?' ':'');
+    else if(r.c.length>1){println(promptEl.textContent+' '+input.value,'cmd');println(r.c.join('  '),'hint');
+      let p=r.c[0];r.c.forEach(x=>{while(!x.startsWith(p))p=p.slice(0,-1);});if(p)input.value=r.pre+p;}
+  }else if(e.key==='ArrowUp'){e.preventDefault();if(hIdx>0){hIdx--;input.value=S.history[hIdx];}}
+  else if(e.key==='ArrowDown'){e.preventDefault();if(hIdx<S.history.length-1){hIdx++;input.value=S.history[hIdx];}else{hIdx=S.history.length;input.value='';}}
+  else if(e.key==='l'&&e.ctrlKey){e.preventDefault();screenEl.innerHTML='';}
+});
+screenEl.addEventListener('click',()=>{if(!window.getSelection().toString())input.focus();});
+$('editSave').onclick=()=>closeEdit(true);$('editCancel').onclick=()=>closeEdit(false);
+$('editor').addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();closeEdit(true);}
+  else if(e.key==='Escape'){e.preventDefault();closeEdit(false);}
+  else if(e.key==='Tab'){e.preventDefault();const t=e.target,s=t.selectionStart;t.value=t.value.slice(0,s)+'    '+t.value.slice(t.selectionEnd);t.selectionStart=t.selectionEnd=s+4;}
+});
+$('overClose').onclick=()=>$('overOverlay').classList.remove('show');
+$('btnTut').onclick=()=>openTut(0);$('sbTut').onclick=()=>openTut(0);
+$('btnUp').onclick=()=>$('fileInput').click();$('sbUp').onclick=()=>$('fileInput').click();
+$('sbExp').onclick=()=>{try{CMDS.export();}catch(e){}};
+$('btnMis').onclick=()=>{println(promptEl.textContent+' missions','cmd');printBlock(CMDS.missions());println('');input.focus();};
+
+/* ---------- 시작 ---------- */
+function enter(isNew){
+  $('setupOverlay').classList.remove('show');
+  $('top').style.display='flex';$('main').style.display='flex';
+  if(isNew){
+    printBlock(`=== HACKHUB LAB ===
+접속 완료. 코드네임: ${S.user}  (가상 서버 srv01 운영자 계정)
+방어·취약점 분석 중심의 6단계 CTF 실습 랩입니다. 모든 것은 브라우저 안의 가상 환경입니다.
+
+  tutorial   → 사용법 튜토리얼
+  missions   → 미션 목록
+  mission 1  → 첫 미션 브리핑
+`,'hint');
+  }else{println('이어하기: '+S.user+' — 저장된 진행을 불러왔습니다. (점수 '+S.score+')','hint');}
+  updateUI();input.focus();
+  let seen=false;try{seen=!!localStorage.getItem(TUT_KEY);}catch(e){}
+  if(isNew&&!seen)openTut(0);
+}
+(function init(){
+  let saved=null;try{saved=localStorage.getItem(SAVE_KEY);}catch(e){}
+  if(saved){try{const o=JSON.parse(saved);if(o&&o.fs&&o.user){$('contBtn').style.display='block';$('contBtn').onclick=()=>{S=o;enter(false);};}}catch(e){}}
+  $('startBtn').onclick=()=>{
+    const n=($('nameInput').value.trim().replace(/[^a-zA-Z0-9_-]/g,''))||'agent';
+    if(saved&&!confirm('저장된 진행이 있습니다. 새로 시작하면 덮어씁니다. 계속할까요?'))return;
+    S=newState(n);buildFS();save();enter(true);
+  };
+  $('nameInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('startBtn').click();});
+})();
+</script>
+</body>
+</html>
